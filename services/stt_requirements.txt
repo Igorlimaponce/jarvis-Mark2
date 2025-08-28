@@ -1,0 +1,8 @@
+# services/stt_requirements.txt
+pika==1.3.2
+vosk==0.3.44
+loguru==0.7.2
+python-dotenv==1.0.1
+pydantic-settings==2.3.4
+soundfile==0.12.1
+pyaudio==0.2.14

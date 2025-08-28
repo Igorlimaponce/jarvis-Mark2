@@ -1,0 +1,12 @@
+langchain-community
+langchain-core
+langchain-openai
+langchain
+pydantic
+pydantic-settings
+loguru
+uvicorn
+fastapi
+pika
+langchain-chroma
+neo4j
