@@ -51,35 +51,38 @@ def synthesize_text(model: TTS, text: str, language: str, speaker: str | None) -
 
 def tts_worker_callback(ch, method, props, body):
     """Função de callback para processar mensagens da fila TTS."""
-    logger.info(f"Recebida requisição TTS com correlation_id: {props.correlation_id}")
-    
     try:
         payload = json.loads(body)
+        job_id = payload.get("job_id")
         text_to_synthesize = payload.get("text")
         language = payload.get("language", "pt")
-
-        if not text_to_synthesize:
-            logger.error("Nenhum texto fornecido na requisição TTS.")
-            # Envia uma resposta vazia para não bloquear o orquestrador
-            response_payload = b''
-        else:
-            response_payload = synthesize_text(
-                tts_model, text_to_synthesize, language, speaker_to_clone
-            ) or b''
-
-    except json.JSONDecodeError:
-        logger.error("Payload da requisição TTS não é um JSON válido.")
-        response_payload = b''
-    
-    # Publica a resposta na fila de callback
-    ch.basic_publish(
-        exchange='',
-        routing_key=props.reply_to,
-        properties=pika.BasicProperties(correlation_id=props.correlation_id),
-        body=response_payload
-    )
-    ch.basic_ack(delivery_tag=method.delivery_tag)
-    logger.info(f"Resposta TTS enviada para a fila '{props.reply_to}'.")
+        if not job_id or not text_to_synthesize:
+            raise ValueError("Payload inválido: job_id ou text ausentes.")
+        audio_bytes = synthesize_text(tts_model, text_to_synthesize, language, speaker_to_clone) or b''
+        response_payload = json.dumps({"job_id": job_id}).encode('utf-8')
+        # Envia o áudio como body binário, job_id no header
+        ch.basic_publish(
+            exchange='jarvis_events',
+            routing_key='tts.completed',
+            properties=pika.BasicProperties(headers={"job_id": job_id}),
+            body=audio_bytes
+        )
+        logger.info(f"TTS concluído para job_id {job_id}.")
+    except Exception as e:
+        logger.exception("Erro no processamento TTS.")
+        job_id = None
+        try:
+            job_id = json.loads(body).get('job_id')
+        except Exception:
+            pass
+        error_payload = json.dumps({"job_id": job_id, "error": str(e)}).encode('utf-8')
+        ch.basic_publish(
+            exchange='jarvis_events',
+            routing_key='tts.failed',
+            body=error_payload
+        )
+    finally:
+        ch.basic_ack(delivery_tag=method.delivery_tag)
 
 if __name__ == "__main__":
     tts_model, speaker_to_clone = load_model()

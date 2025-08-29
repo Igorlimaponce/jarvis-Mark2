@@ -21,7 +21,8 @@ soundfile==0.12.1
 langchain-chroma==0.1.1
 unstructured==0.14.9
 langchain-community==0.2.5
-pika==1.3.2
+pika>=1.3.2
+websockets==12.0
 pydantic-settings==2.3.4
 langgraph==0.1.1
 webrtcvad-wheels==2.0.10.post2
@@ -29,4 +30,4 @@ neo4j==5.22.0
 spacy==3.7.5
 sudachipy==0.6.8
 sudachidict-core==20230110
-
+aio-pika==9.4.0

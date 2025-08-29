@@ -1,38 +1,27 @@
 from __future__ import annotations
 import tempfile
 from pathlib import Path
-import uuid
 import requests
 from loguru import logger
 import threading
 import time
+import asyncio
+import websockets
+import json
 
 from assistant.audio_manager import AudioManager
 from assistant.audio_output import AudioOutput
 from assistant.wake_word_detector import WakeWordDetector
-from config.settings import settings, ROOT_DIR
-
-SESSION_CACHE_FILE = ROOT_DIR / ".session_id_cache"
+from config.settings import settings
 
 class ClientState:
     LISTENING = 1
     PROCESSING = 2
-    SPEAKING = 3
-
-def get_or_create_session_id() -> str:
-    if SESSION_CACHE_FILE.exists():
-        session_id = SESSION_CACHE_FILE.read_text().strip()
-        if session_id:
-            logger.info(f"Retomando sessão existente: {session_id}")
-            return session_id
-    session_id = str(uuid.uuid4())
-    SESSION_CACHE_FILE.write_text(session_id)
-    logger.info(f"Iniciando nova sessão de cliente: {session_id}")
-    return session_id
 
 def main():
-    orchestrator_url = str(settings.api.orchestrator_url)
-    session_id = get_or_create_session_id()
+    """Função principal que gerencia o estado do cliente e o loop de interação."""
+    orchestrator_ws_url = str(settings.api.orchestrator_url).replace("http", "ws")
+    orchestrator_http_url = str(settings.api.orchestrator_url)
 
     try:
         detector = WakeWordDetector()
@@ -44,9 +33,9 @@ def main():
 
     state = ClientState.LISTENING
     stop_event = threading.Event()
-    
+
     def wake_word_listener():
-        logger.info("Thread de detecção iniciada.")
+        """Thread que escuta a wake word em background."""
         while not stop_event.is_set():
             if state == ClientState.LISTENING:
                 audio_manager.listen_for_wake_word()
@@ -57,7 +46,7 @@ def main():
     listener_thread = threading.Thread(target=wake_word_listener, daemon=True)
     listener_thread.start()
 
-    logger.info("Cliente iniciado. Diga 'Jarvis' para começar.")
+    logger.info("Cliente V2 iniciado. Diga 'Jarvis' para começar.")
 
     try:
         while True:
@@ -67,29 +56,64 @@ def main():
                     audio_manager.record_command(command_audio_path)
 
                     logger.info("Enviando comando para o orquestrador...")
-                    with open(command_audio_path, "rb") as f:
-                        files = {"audio_file": (command_audio_path.name, f, "audio/wav")}
-                        headers = {"X-Session-Id": session_id}
-                        response = requests.post(
-                            f"{orchestrator_url}/interact", files=files, headers=headers, timeout=120, stream=True
-                        )
+                    job_id = None
+                    try:
+                        with open(command_audio_path, "rb") as f:
+                            files = {"audio_file": (command_audio_path.name, f, "audio/wav")}
+                            response = requests.post(
+                                f"{orchestrator_http_url}/v2/interact/start", files=files, timeout=10
+                            )
+                            response.raise_for_status()
+                            job_id = response.json().get("job_id")
+                            logger.info(f"Job iniciado com ID: {job_id}")
 
-                    if response.status_code == 200:
-                        state = ClientState.SPEAKING
-                        for audio_chunk in response.iter_content(chunk_size=None):
-                            if audio_chunk:
-                                audio_output.play_audio_stream(audio_chunk)
+                    except requests.RequestException as e:
+                        logger.error(f"Erro ao iniciar a interação: {e}")
                         state = ClientState.LISTENING
-                        logger.info("Ouvindo novamente...")
-                    else:
-                        logger.error(f"Erro na API: {response.status_code} - {response.text}")
-                        state = ClientState.LISTENING
+                        continue  # Volta a escutar
+
+                    if job_id:
+                        # Inicia a comunicação via WebSocket
+                        asyncio.run(handle_websocket_communication(orchestrator_ws_url, job_id, audio_output))
+                
+                # Após o processamento (sucesso ou falha), volta a escutar
+                state = ClientState.LISTENING
+                logger.info("Ouvindo novamente...")
 
             time.sleep(0.1)
     except KeyboardInterrupt:
         logger.info("Cliente finalizado pelo usuário.")
         stop_event.set()
         listener_thread.join()
+
+async def handle_websocket_communication(uri, job_id, audio_output):
+    """Gerencia a comunicação WebSocket para um job específico."""
+    ws_uri = f"{uri}/v2/interact/ws/{job_id}"
+    logger.info(f"Conectando ao WebSocket: {ws_uri}")
+    try:
+        async with websockets.connect(ws_uri, timeout=120) as websocket:
+            while True:
+                message = await websocket.recv()
+                if isinstance(message, str):
+                    # Mensagens de status ou erro em JSON
+                    data = json.loads(message)
+                    if "error" in data:
+                        logger.error(f"Recebido erro do orquestrador: {data}")
+                        # TODO: Reproduzir um som de erro genérico
+                        break
+                    else:
+                        logger.info(f"Status update: {data}")
+                elif isinstance(message, bytes):
+                    # Resposta de áudio final
+                    logger.info(f"Recebido stream de áudio de {len(message)} bytes. Reproduzindo...")
+                    audio_output.play_audio_stream(message)
+                    logger.info("Reprodução finalizada.")
+                    break  # Finaliza a conexão após receber o áudio
+
+    except websockets.exceptions.ConnectionClosed as e:
+        logger.warning(f"Conexão WebSocket fechada: {e}")
+    except Exception:
+        logger.exception("Erro na comunicação WebSocket:")
 
 if __name__ == "__main__":
     main()
