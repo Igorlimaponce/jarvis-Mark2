@@ -53,7 +53,7 @@ class ConversationMessage(Base):
 	role: Mapped[str] = mapped_column(String(50), nullable=False)
 	content: Mapped[str] = mapped_column(Text, nullable=False)
 	timestamp: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True))
-	metadata: Mapped[Optional[dict]] = mapped_column(JSON)
+	document_metadata: Mapped[Optional[dict]] = mapped_column("metadata", JSON)
 
 	session: Mapped[ConversationSession] = relationship("ConversationSession", back_populates="messages")
 	tool_usages: Mapped[list[ToolUsageLog]] = relationship("ToolUsageLog", back_populates="message")
@@ -106,6 +106,6 @@ class KnowledgeBaseDocument(Base):
 	document_id: Mapped[int] = mapped_column(Integer, primary_key=True)
 	source_path: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
 	document_type: Mapped[Optional[str]] = mapped_column(String(50))
-	metadata: Mapped[Optional[dict]] = mapped_column(JSON)
+	document_metadata: Mapped[Optional[dict]] = mapped_column("metadata", JSON)
 	last_indexed_at: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP(timezone=True))
 	chromadb_collection_name: Mapped[Optional[str]] = mapped_column(String(255))

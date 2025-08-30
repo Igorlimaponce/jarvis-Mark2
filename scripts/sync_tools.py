@@ -11,7 +11,7 @@ sys.path.append(str(ROOT_DIR))
 from loguru import logger
 from sqlalchemy.orm import Session
 
-from database.connection import get_session_local
+from database.connection import SessionLocal
 from database.models import Tool
 from tools.__all_tools__ import get_all_tools
 
@@ -20,7 +20,7 @@ def sync_tools_to_db():
     Sincroniza as ferramentas definidas no código Python com a tabela 'tools' no banco de dados.
     """
     logger.info("Iniciando sincronização de ferramentas com o banco de dados...")
-    SessionLocal = get_session_local()
+    
     
     with SessionLocal() as db:
         try:

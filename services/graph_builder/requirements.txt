@@ -10,3 +10,4 @@ fastapi
 pika
 langchain-chroma
 neo4j
+spacy

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import operator
 from typing import Annotated, TypedDict, Union, Optional
-
+from langchain_core.utils.function_calling import convert_to_openai_tool
 from langchain_core.agents import AgentAction, AgentFinish
 from langchain_core.messages import BaseMessage
 from langgraph.graph import END, StateGraph
@@ -28,8 +28,10 @@ def create_graph_workflow() -> StateGraph:
     llm = get_llm()
     tools = get_all_tools()
     # Vincula as ferramentas ao LLM para que ele saiba quando e como chamá-las
-    llm_with_tools = llm.bind_tools(tools)
+    tools_as_openai = [convert_to_openai_tool(t) for t in tools]
 
+# 2. Anexa as ferramentas convertidas ao modelo usando o método .bind()
+    llm_with_tools = llm.bind(tools=tools_as_openai)
     # --- Nós do Grafo ---
 
     def agent_node(state: AgentState):

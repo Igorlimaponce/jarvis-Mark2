@@ -16,8 +16,8 @@ from sqlalchemy.orm import Session
 from assistant.agent_core import get_llm
 from config.prompts import SUMMARIZE_PROMPT
 from config.settings import settings
-from database.connection import get_session_local  # Importar o sessionmaker
-from database.models import ConversationHistory, ConversationSession, User
+from database.connection import SessionLocal  # Importar a fábrica de sessões diretamente
+from database.models import ConversationMessage as ConversationHistory, ConversationSession, User
 
 
 def get_unsummarized_sessions(db: Session) -> list[ConversationSession]:
@@ -92,7 +92,6 @@ def run_summarizer_worker():
     """Loop principal do worker que busca, sumariza e atualiza as conversas."""
     logger.info("Worker de sumarização de memória iniciado.")
     llm = get_llm()
-    SessionLocal = get_session_local()  # Obter a factory de sessões
 
     while True:
         try:

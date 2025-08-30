@@ -1,9 +1,11 @@
 import pika
+from dotenv import load_dotenv
 import os
 import uuid
 import time # Adicionar este import
 from loguru import logger # Adicionar este import
 
+load_dotenv()
 class MQClient:
     def __init__(self):
         self.url = os.getenv("RABBITMQ_URL")

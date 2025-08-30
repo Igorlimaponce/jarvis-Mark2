@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import ClassVar
-
+from dotenv import load_dotenv
 from pydantic import Field, PostgresDsn, HttpUrl, AmqpDsn
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+load_dotenv()
 # --- Sub-modelos para Configurações Aninhadas ---
 
 class AppSettings(BaseSettings):
@@ -17,11 +18,14 @@ class AppSettings(BaseSettings):
 
 class DBSettings(BaseSettings):
     """Configurações do banco de dados PostgreSQL."""
-    host: str = "localhost"
-    port: int = 5432
-    user: str = "postgres"
-    password: str = "password"
-    name: str = "jarvis_db"
+    model_config = SettingsConfigDict(env_prefix='POSTGRES_')
+
+    HOST: str = "localhost"
+    PORT: int = 5432
+    USER: str
+    PASSWORD: str
+    DB: str
+
 
     @property
     def dsn(self) -> str:
@@ -29,11 +33,11 @@ class DBSettings(BaseSettings):
         return str(
             PostgresDsn.build(
                 scheme="postgresql",
-                username=self.user,
-                password=self.password,
-                host=self.host,
-                port=self.port,
-                path=self.name,
+                username=self.USER,
+                password=self.PASSWORD,
+                host=self.HOST,
+                port=self.PORT,
+                path=self.DB,
             )
         )
 
@@ -64,7 +68,7 @@ class PorcupineSettings(BaseSettings):
 class RabbitMQSettings(BaseSettings):
     """Configurações para o message broker RabbitMQ."""
     # Ex: amqp://user:password@host:port/
-    url: AmqpDsn = "amqp://user:password@localhost:5672/"
+    url: AmqpDsn = Field(..., alias='RABBITMQ_URL')
 
 
 # --- Classe Principal de Configurações ---
@@ -82,7 +86,7 @@ class Settings(BaseSettings):
 
     # Mapeia as variáveis de ambiente para as classes de configuração
     app: AppSettings = Field(default_factory=AppSettings)
-    db: DBSettings | None = None
+    db: DBSettings = Field(default_factory=DBSettings)
     llm: LLMSettings = Field(default_factory=LLMSettings)
     stt: STTSettings = Field(default_factory=STTSettings)
     tts: TTSSettings = Field(default_factory=TTSSettings)

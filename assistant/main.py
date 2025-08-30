@@ -99,7 +99,7 @@ async def start_event_consumer():
         mq_channel = await mq_connection.channel()
         
         # Garante que a topologia (exchange e filas) existe
-        await mq_channel.exchange_declare(name="jarvis_events", type="topic", durable=True)
+        await mq_channel.declare_exchange(name="jarvis_events", type="topic", durable=True)
         queue = await mq_channel.declare_queue("orchestrator_events_queue", durable=True)
         
         # Binds para os eventos que o orquestrador precisa ouvir

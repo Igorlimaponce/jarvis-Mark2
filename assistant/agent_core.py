@@ -27,9 +27,6 @@ def get_llm() -> BaseChatModel:
         temperature=settings.llm.temperature,
     )
 
-
-from .agent_graph import app_graph
-
 def get_agent_graph():
     """Retorna o grafo de agente compilado."""
     # O grafo já é compilado na importação, então apenas o retornamos.

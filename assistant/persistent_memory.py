@@ -6,8 +6,7 @@ from langchain_core.messages import BaseMessage, messages_from_dict, messages_to
 from sqlalchemy.orm import Session
 from loguru import logger # Adicionar import para logging
 
-from database.models import ConversationHistory as HistoryModel, ConversationSession as SessionModel, User
-
+from database.models import ConversationMessage as HistoryModel, ConversationSession as SessionModel, User
 class PGConversationMemory(ConversationBufferMemory):
     session_id: str
     db_session: Session
